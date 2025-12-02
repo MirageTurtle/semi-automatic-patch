@@ -154,19 +154,51 @@ def main():
         elif args.command == "apply-from-file":
             try:
                 commit_manager = CommitManager(Path(args.commit_file))
-                source_commit = commit_manager.get_previous_commit(args.base_commit)
-                position, total = commit_manager.get_commit_position(args.base_commit)
-                print(f"Working on commit {position}/{total}: {args.base_commit}")
-                print(f"Applying patch from: {source_commit}\n")
-
                 config = Config(repo_path=Path(args.repo), notes_ref=args.notes_ref)
                 workflow = PatchApplicationWorkflow(config)
-                return workflow.execute(
-                    source_commit=source_commit,
-                    base_commit=args.base_commit,
-                    skip_resolution=args.skip_resolution,
-                    resume=args.resume,
-                )
+
+                current_commit = args.base_commit
+
+                while True:
+                    try:
+                        source_commit = commit_manager.get_previous_commit(current_commit)
+                        position, total = commit_manager.get_commit_position(current_commit)
+                        print(f"Working on commit {position}/{total}: {current_commit}")
+                        print(f"Applying patch from: {source_commit}\n")
+
+                        result = workflow.execute(
+                            source_commit=source_commit,
+                            base_commit=current_commit,
+                            skip_resolution=args.skip_resolution,
+                            resume=args.resume,
+                        )
+
+                        if result != 0:
+                            # Workflow failed, checkpoint is saved
+                            print(f"\nWorkflow failed on commit {position}/{total}")
+                            print(f"Run with --resume to continue from this commit\n")
+                            return result
+
+                        # Workflow succeeded, try to move to next commit
+                        try:
+                            current_commit = commit_manager.get_next_commit(current_commit)
+                            args.resume = False  # Reset resume flag for next commit
+                        except CommitManagerError:
+                            # No more commits to process
+                            print(f"\n{'=' * 60}")
+                            print("All commits processed successfully!")
+                            print(f"{'=' * 60}\n")
+                            return 0
+
+                    except CommitManagerError as e:
+                        if "No previous commit" in str(e):
+                            # Reached the beginning of the commit sequence
+                            print(f"\n{'=' * 60}")
+                            print("Reached the beginning of the commit sequence!")
+                            print(f"{'=' * 60}\n")
+                            return 0
+                        raise
+
             except CommitManagerError as e:
                 print(f"Error: {e}", file=sys.stderr)
                 return 1
