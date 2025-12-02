@@ -38,13 +38,14 @@ class GitOps:
         if not git_dir.exists():
             raise GitOperationError(f"Not a git repository: {repo_path}")
 
-    def _run_git(self, *args, cwd: Optional[Path] = None, check: bool = True) -> str:
+    def _run_git(self, *args, cwd: Optional[Path] = None, check: bool = True, strip: bool = True) -> str:
         """Run a git command and return output.
 
         Args:
             args: Git command arguments (after 'git').
             cwd: Working directory for command.
             check: Raise on non-zero exit code.
+            strip: Strip leading/trailing whitespace from output.
 
         Returns:
             Command output (stdout).
@@ -59,7 +60,7 @@ class GitOps:
             result = subprocess.run(
                 cmd, cwd=cwd, capture_output=True, text=True, check=check
             )
-            return result.stdout.strip()
+            return result.stdout.strip() if strip else result.stdout
         except subprocess.CalledProcessError as e:
             error_msg = f"Git command failed: {' '.join(cmd)}\n{e.stderr}"
             logger.error(error_msg)
@@ -113,8 +114,9 @@ class GitOps:
         """
         logger.info(f"Reading git note from {commit}")
         try:
-            note = self._run_git("notes", f"--ref={self.notes_ref}", "show", commit)
-            logger.debug(f"First 100 chars of note: {note[:100]}")
+            note = self._run_git("notes", f"--ref={self.notes_ref}", "show", commit, strip=False)
+            logger.debug(f"First 20 lines of note: {'\n'.join(note.splitlines()[:20])}")
+            logger.debug(f"Last 20 lines of note: {'\n'.join(note.splitlines()[-20:])}")
             return note
         except GitOperationError as e:
             if "No note found" in str(e) or "ref/notes" in str(e):
