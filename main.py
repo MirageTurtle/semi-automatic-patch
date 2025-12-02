@@ -107,11 +107,9 @@ def main():
     # Setup logging
     setup_logging(verbose=getattr(args, "verbose", False))
 
-    # Initialize config
-    config = Config(repo_path=Path(args.repo), notes_ref=args.notes_ref)
-
     try:
         if args.command == "apply":
+            config = Config(repo_path=Path(args.repo), notes_ref=args.notes_ref)
             workflow = PatchApplicationWorkflow(config)
             return workflow.execute(
                 source_commit=args.source_commit,
@@ -121,12 +119,14 @@ def main():
             )
 
         elif args.command == "show":
+            config = Config(repo_path=Path(args.repo), notes_ref=args.notes_ref)
             workflow = PatchApplicationWorkflow(config)
             patch = workflow.show_git_note(args.commit)
             print(patch)
             return 0
 
         elif args.command == "create-note":
+            config = Config(repo_path=Path(args.repo), notes_ref=args.notes_ref)
             workflow = PatchApplicationWorkflow(config)
             commit = args.commit or "HEAD"
             workflow.create_git_note(commit)

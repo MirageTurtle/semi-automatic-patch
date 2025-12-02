@@ -114,6 +114,7 @@ class GitOps:
         logger.info(f"Reading git note from {commit}")
         try:
             note = self._run_git("notes", f"--ref={self.notes_ref}", "show", commit)
+            logger.debug(f"First 100 chars of note: {note[:100]}")
             return note
         except GitOperationError as e:
             if "No note found" in str(e) or "ref/notes" in str(e):
