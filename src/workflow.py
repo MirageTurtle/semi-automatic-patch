@@ -2,8 +2,6 @@
 Workflow orchestration module for patch application.
 """
 
-import sys
-from pathlib import Path
 
 from .config import Config
 from .utils import get_logger
@@ -136,7 +134,7 @@ class PatchApplicationWorkflow:
                         print("\n" + "=" * 60)
                         print("MANUAL RESOLUTION REQUIRED")
                         print("=" * 60)
-                        print(f"\nPlease resolve the following rejection files:")
+                        print("\nPlease resolve the following rejection files:")
                         for rej_file in rejections:
                             print(f"  - {rej_file.relative_to(self.config.repo_path)}")
                         print("\nAfter resolving all conflicts:")

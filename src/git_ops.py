@@ -172,26 +172,6 @@ class GitOps:
         """
         logger.info(f"Creating git note for {commit}")
 
-        # Get the diff
-        diff = self._run_git("diff", "HEAD")
-
-        if not diff:
-            logger.warning("No changes to create note from")
-            return ""
-
-        # Create the note
-        self._run_git(
-            "notes",
-            f"--ref={self.notes_ref}",
-            "add",
-            "-f",
-            "-F",
-            "-",
-            commit,
-            input=diff,
-        )
-
-        # In reality, we need to pipe the diff, so let's use a subprocess approach
         try:
             # Get diff
             diff_result = subprocess.run(
@@ -218,6 +198,7 @@ class GitOps:
                 input=diff_result.stdout,
                 cwd=self.repo_path,
                 capture_output=True,
+                text=True,
                 check=True,
             )
 
