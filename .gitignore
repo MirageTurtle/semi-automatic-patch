@@ -8,3 +8,9 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Workflow checkpoint (for resumption on failure)
+.workflow_checkpoint.json
+
+CLAUDE.md
+PLAN.md
