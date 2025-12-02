@@ -82,6 +82,18 @@ class PatchApplicationWorkflow:
                 print("or remove .workflow_checkpoint.json to start fresh.\n")
                 return 1
 
+            # Validate no existing git note on target commit (commit B)
+            if start_step <= 1:
+                logger.info("Checking for existing git note on target commit")
+                existing_note = self.git.get_git_note(base_commit)
+                if existing_note:
+                    raise WorkflowError(
+                        f"Git note already exists for target commit {base_commit}. "
+                        "Cannot proceed - the target commit already has a patch note. "
+                        "Choose a different target commit or remove the existing note with:\n"
+                        f"  git notes --ref={self.config.notes_ref} remove {base_commit}"
+                    )
+
             # Step 1: Ensure working directory is clean (only on fresh start)
             if start_step <= 1:
                 logger.info("Step 1: Checking working directory")
