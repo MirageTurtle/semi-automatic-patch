@@ -14,6 +14,7 @@ from src.workflow import PatchApplicationWorkflow
 from src.config import Config
 from src.utils import setup_logging
 from src.checkpoint import Checkpoint
+from src.commit_manager import CommitManager, CommitManagerError
 
 
 def parse_arguments():
@@ -23,8 +24,11 @@ def parse_arguments():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Apply patch from commit A to commit B
+  # Apply patch from commit A to commit B (explicit)
   python main.py apply abc123 def456
+
+  # Apply patch using commit file (auto-finds A from file)
+  python main.py apply-from-file commits.txt def456
 
   # Resume from last checkpoint (if workflow failed)
   python main.py apply abc123 def456 --resume
@@ -64,6 +68,35 @@ Examples:
         help="Resume from last checkpoint if workflow was interrupted",
     )
     apply_parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Verbose output"
+    )
+
+    # Apply from file command
+    apply_file_parser = subparsers.add_parser(
+        "apply-from-file",
+        help="Apply patch using commit from file (auto-finds previous commit)",
+    )
+    apply_file_parser.add_argument(
+        "commit_file", help="File containing list of commit hashes"
+    )
+    apply_file_parser.add_argument(
+        "base_commit", help="Base commit to apply patch to (commit B)"
+    )
+    apply_file_parser.add_argument("--repo", default=".", help="Git repository path")
+    apply_file_parser.add_argument(
+        "--notes-ref", default="krr-patch", help="Git notes reference"
+    )
+    apply_file_parser.add_argument(
+        "--skip-resolution",
+        action="store_true",
+        help="Skip automatic conflict resolution",
+    )
+    apply_file_parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume from last checkpoint if workflow was interrupted",
+    )
+    apply_file_parser.add_argument(
         "--verbose", "-v", action="store_true", help="Verbose output"
     )
 
@@ -117,6 +150,26 @@ def main():
                 skip_resolution=args.skip_resolution,
                 resume=args.resume,
             )
+
+        elif args.command == "apply-from-file":
+            try:
+                commit_manager = CommitManager(Path(args.commit_file))
+                source_commit = commit_manager.get_previous_commit(args.base_commit)
+                position, total = commit_manager.get_commit_position(args.base_commit)
+                print(f"Working on commit {position}/{total}: {args.base_commit}")
+                print(f"Applying patch from: {source_commit}\n")
+
+                config = Config(repo_path=Path(args.repo), notes_ref=args.notes_ref)
+                workflow = PatchApplicationWorkflow(config)
+                return workflow.execute(
+                    source_commit=source_commit,
+                    base_commit=args.base_commit,
+                    skip_resolution=args.skip_resolution,
+                    resume=args.resume,
+                )
+            except CommitManagerError as e:
+                print(f"Error: {e}", file=sys.stderr)
+                return 1
 
         elif args.command == "show":
             config = Config(repo_path=Path(args.repo), notes_ref=args.notes_ref)
