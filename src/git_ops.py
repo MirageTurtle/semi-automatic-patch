@@ -119,7 +119,8 @@ class GitOps:
             logger.debug(f"Last 20 lines of note: {'\n'.join(note.splitlines()[-20:])}")
             return note
         except GitOperationError as e:
-            if "No note found" in str(e) or "ref/notes" in str(e):
+            error_str = str(e).lower()
+            if "no note found" in error_str or "ref/notes" in error_str:
                 logger.warning(f"No git note found for {commit}")
                 return ""
             raise
