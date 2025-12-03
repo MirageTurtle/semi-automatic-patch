@@ -12,9 +12,12 @@ from pathlib import Path
 
 from src.workflow import PatchApplicationWorkflow
 from src.config import Config
-from src.utils import setup_logging
+from src.utils import setup_logging, get_logger
 from src.checkpoint import Checkpoint
 from src.commit_manager import CommitManager, CommitManagerError
+from src.candidate_selector import CandidateSelector
+
+logger = get_logger(__name__)
 
 
 def parse_arguments():
@@ -97,6 +100,12 @@ Examples:
         help="Resume from last checkpoint if workflow was interrupted",
     )
     apply_file_parser.add_argument(
+        "--max-candidates",
+        type=int,
+        default=3,
+        help="Maximum number of candidate commits to try (default: 3)",
+    )
+    apply_file_parser.add_argument(
         "--verbose", "-v", action="store_true", help="Verbose output"
     )
 
@@ -156,17 +165,49 @@ def main():
                 commit_manager = CommitManager(Path(args.commit_file))
                 config = Config(repo_path=Path(args.repo), notes_ref=args.notes_ref)
                 workflow = PatchApplicationWorkflow(config)
+                selector = CandidateSelector(commit_manager, workflow)
 
                 current_commit = args.base_commit
 
                 while True:
                     try:
-                        source_commit = commit_manager.get_previous_commit(current_commit)
                         position, total = commit_manager.get_commit_position(current_commit)
                         print(f"Working on commit {position}/{total}: {current_commit}")
-                        print(f"Applying patch from: {source_commit}\n")
+                        print(f"Searching for best patch candidate (max: {args.max_candidates})...\n")
 
-                        result = workflow.execute(
+                        # Multi-candidate search
+                        search_result = selector.select_best_candidate(
+                            base_commit=current_commit,
+                            max_candidates=args.max_candidates,
+                        )
+
+                        if not search_result.best_candidate:
+                            print(f"ERROR: No valid candidates found for {current_commit}")
+                            print(f"Reason: {search_result.selection_reason}")
+                            print(f"Tip: Create git notes for previous commits or increase --max-candidates\n")
+                            return 1
+
+                        source_commit = search_result.best_candidate
+                        print(f"Selected candidate: {source_commit}")
+                        print(f"Reason: {search_result.selection_reason}")
+
+                        # Show trial summary if multiple candidates were tried
+                        if len(search_result.trial_results) > 1:
+                            print("\nTrial results:")
+                            for trial in search_result.trial_results:
+                                status = "SUCCESS" if trial.success else "FAILED"
+                                rejections = (
+                                    f"{trial.rejection_count} rejections"
+                                    if trial.success
+                                    else trial.error_message or "error"
+                                )
+                                print(f"  {trial.source_commit}: {status} ({rejections})")
+                        print()
+
+                        # Complete the workflow
+                        # Patch is already applied from trial with 0 rejections
+                        logger.info(f"Completing workflow for clean patch application")
+                        result = workflow.complete_patch_application(
                             source_commit=source_commit,
                             base_commit=current_commit,
                             skip_resolution=args.skip_resolution,

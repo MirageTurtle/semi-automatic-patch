@@ -150,3 +150,26 @@ class CommitManager:
         """
         index = self.find_commit_index(commit)
         return index + 1, len(self.commits)
+
+    def get_previous_commits(self, commit: str, count: int) -> List[str]:
+        """Get up to count previous commits before the given commit.
+
+        Args:
+            commit: The commit to get predecessors for.
+            count: Maximum number of previous commits to return.
+
+        Returns:
+            List of previous commits in order (nearest first).
+
+        Raises:
+            CommitManagerError: If commit not found.
+        """
+        index = self.find_commit_index(commit)
+        previous_commits = []
+
+        for i in range(1, count + 1):
+            if index - i < 0:
+                break
+            previous_commits.append(self.commits[index - i])
+
+        return previous_commits
