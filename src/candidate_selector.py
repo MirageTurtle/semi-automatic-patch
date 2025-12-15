@@ -41,16 +41,18 @@ class CandidateSelector:
         self.workflow = workflow
 
     def find_candidates(
-        self, base_commit: str, max_candidates: int
+        self, base_commit: str, max_candidates: int, search_forward: bool = False
     ) -> List[str]:
-        """Find candidates going backwards from base_commit.
+        """Find candidates from base_commit.
 
-        Searches backwards in the commit list for up to max_candidates
-        commits that have git notes.
+        Searches the commit list for up to max_candidates commits that have git notes.
+        By default searches backwards (previous commits). With search_forward=True,
+        searches forwards (subsequent commits).
 
         Args:
             base_commit: Target commit (commit B).
             max_candidates: Maximum number of candidates to find.
+            search_forward: If True, search forward in commits. If False (default), search backward.
 
         Returns:
             List of candidate commits in order (nearest first).
@@ -63,13 +65,25 @@ class CandidateSelector:
             logger.error(f"Could not find base commit: {e}")
             return candidates
 
-        # Search backwards up to max_candidates positions
-        for i in range(1, max_candidates + 1):
-            if base_index - i < 0:
-                logger.debug(f"Reached beginning of commit list after {i - 1} candidates")
-                break
+        direction = "forward" if search_forward else "backward"
+        logger.debug(f"Searching {direction} for candidates")
 
-            candidate = self.commit_manager.commits[base_index - i]
+        # Search up to max_candidates positions
+        for i in range(1, max_candidates + 1):
+            if search_forward:
+                # Search forward (increasing indices)
+                next_index = base_index + i
+                if next_index >= len(self.commit_manager.commits):
+                    logger.debug(f"Reached end of commit list after {i - 1} candidates")
+                    break
+                candidate = self.commit_manager.commits[next_index]
+            else:
+                # Search backward (decreasing indices)
+                next_index = base_index - i
+                if next_index < 0:
+                    logger.debug(f"Reached beginning of commit list after {i - 1} candidates")
+                    break
+                candidate = self.commit_manager.commits[next_index]
 
             # Check if candidate has git note
             note = self.workflow.git.get_git_note(candidate)
@@ -83,12 +97,12 @@ class CandidateSelector:
         return candidates
 
     def select_best_candidate(
-        self, base_commit: str, max_candidates: int
+        self, base_commit: str, max_candidates: int, search_forward: bool = False
     ) -> CandidateSearchResult:
         """Select the best patch candidate from available options.
 
-        Searches backward through the commit list for candidates with git notes,
-        tries each one, and selects:
+        Searches through the commit list for candidates with git notes, tries each one,
+        and selects:
         - If any succeed cleanly: the first one with 0 rejections (stops early)
         - Otherwise: the one with the fewest rejections
 
@@ -98,21 +112,24 @@ class CandidateSelector:
         Args:
             base_commit: Target commit (commit B).
             max_candidates: Maximum number of candidates to try.
+            search_forward: If True, search forward in commits. If False (default), search backward.
 
         Returns:
             CandidateSearchResult with selection information and patch_applied flag.
         """
-        logger.info(f"Searching for best patch candidate (max: {max_candidates})")
+        direction = "forward" if search_forward else "backward"
+        logger.info(f"Searching {direction} for best patch candidate (max: {max_candidates})")
 
         # Step 1: Find candidates
-        candidates = self.find_candidates(base_commit, max_candidates)
+        candidates = self.find_candidates(base_commit, max_candidates, search_forward=search_forward)
 
         if not candidates:
             logger.warning("No valid candidates found with git notes")
+            search_dir = "forward" if search_forward else "backward"
             return CandidateSearchResult(
                 best_candidate=None,
                 trial_results=[],
-                selection_reason=f"No candidates with git notes found (searched {max_candidates} commits backward)",
+                selection_reason=f"No candidates with git notes found (searched {max_candidates} commits {search_dir})",
                 patch_applied=False,
             )
 

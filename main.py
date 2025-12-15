@@ -33,6 +33,9 @@ Examples:
   # Apply patch using commit file (auto-finds A from file)
   python main.py apply-from-file commits.txt def456
 
+  # Search forward instead of backward for patch candidates
+  python main.py apply-from-file commits.txt def456 --search-forward
+
   # Resume from last checkpoint (if workflow failed)
   python main.py apply abc123 def456 --resume
 
@@ -104,6 +107,11 @@ Examples:
         type=int,
         default=3,
         help="Maximum number of candidate commits to try (default: 3)",
+    )
+    apply_file_parser.add_argument(
+        "--search-forward",
+        action="store_true",
+        help="Search forward (subsequent commits) instead of backward (previous commits)",
     )
     apply_file_parser.add_argument(
         "--verbose", "-v", action="store_true", help="Verbose output"
@@ -179,6 +187,7 @@ def main():
                         search_result = selector.select_best_candidate(
                             base_commit=current_commit,
                             max_candidates=args.max_candidates,
+                            search_forward=args.search_forward,
                         )
 
                         if not search_result.best_candidate:
