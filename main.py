@@ -231,7 +231,12 @@ def main():
 
                         # Workflow succeeded, try to move to next commit
                         try:
-                            current_commit = commit_manager.get_next_commit(current_commit)
+                            if args.search_forward:
+                                # When searching forward, iterate backward through commits
+                                current_commit = commit_manager.get_previous_commit(current_commit)
+                            else:
+                                # Default: iterate forward through commits
+                                current_commit = commit_manager.get_next_commit(current_commit)
                             args.resume = False  # Reset resume flag for next commit
                         except CommitManagerError:
                             # No more commits to process
@@ -241,10 +246,10 @@ def main():
                             return 0
 
                     except CommitManagerError as e:
-                        if "No previous commit" in str(e):
-                            # Reached the beginning of the commit sequence
+                        if "No previous commit" in str(e) or "No next commit" in str(e):
+                            # Reached the end of the commit sequence
                             print(f"\n{'=' * 60}")
-                            print("Reached the beginning of the commit sequence!")
+                            print("Reached the end of the commit sequence!")
                             print(f"{'=' * 60}\n")
                             return 0
                         raise
