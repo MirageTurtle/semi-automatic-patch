@@ -137,3 +137,18 @@ semi-automatic-patch/
 │     - Clear checkpoint                                          │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+## Notes
+
+It’s easy to see that if a patch has a problem, fixing it can be difficult. My previous approach was to rely on statements like the following, and then wrap them in a bash script to complete the process. You can find an example at [scripts/fix_example.sh](scripts/fix_exmaple.sh).
+
+```bash
+git_repo checkout "$commit_hash"
+
+git_repo notes --ref=krr-patch show $(git_repo rev-parse HEAD) |
+    sed 's/vma->vm_flags |= (VM_SHARED| VM_DONTEXPAND | VM_DONTDUMP);/vm_flags_set(vma, VM_SHARED | VM_DONTEXPAND | VM_DONTDUMP);/' |
+    git_repo notes --ref=krr-patch add -F - -f
+
+# Verification
+git_repo notes --ref=krr-patch show $(git_repo rev-parse HEAD) | rg vm_flags_set
+```
